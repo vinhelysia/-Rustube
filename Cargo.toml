@@ -1,0 +1,27 @@
+[package]
+name = "ytdl"
+version = "0.1.0"
+edition = "2021"
+description = "A native desktop YouTube downloader built in Rust with egui, powered by yt-dlp."
+license = "GPL-3.0-only"
+
+[[bin]]
+name = "ytdl"
+path = "src/main.rs"
+
+[dependencies]
+yt-dlp  = "2.7.2"
+tokio   = { version = "1", features = ["macros", "rt-multi-thread"] }
+anyhow  = "1"
+# glow (OpenGL) renderer instead of the default wgpu, which panics on some
+# Intel integrated GPUs ("Failed to create staging buffer").
+eframe  = { version = "0.34", default-features = false, features = ["glow", "default_fonts"] }
+rfd     = "0.17"
+
+# lofty 0.23.x is yanked on crates.io (RUSTSEC-2024-0436 / abandoned `paste`).
+# yt-dlp 2.7.2 relies on a [patch] to a fork, but that patch isn't published and
+# the fork's `main` has since moved to 0.24.0 (which no longer satisfies ^0.23.2).
+# So we pin to the exact fork commit tagged "0.23.3" — the paste->pastey fix
+# release that still satisfies yt-dlp's `lofty = "0.23.2"` requirement.
+[patch.crates-io]
+lofty = { git = "https://github.com/boul2gom/lofty-rs", rev = "f3fcfd031067ee5ba42a8745a42fed031ff0d7aa" }

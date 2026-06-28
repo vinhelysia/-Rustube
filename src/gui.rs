@@ -52,16 +52,11 @@ pub struct YtdlApp {
     log_tx:       Sender<String>,
     log_rx:       Receiver<String>,
     downloading:  Arc<AtomicBool>,
-    runtime:      tokio::runtime::Runtime,
 }
 
 impl YtdlApp {
     pub fn new() -> Self {
         let (log_tx, log_rx) = mpsc::channel();
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("failed to build tokio runtime");
         Self {
             url:          String::new(),
             quality:      Quality::default(),
@@ -72,7 +67,6 @@ impl YtdlApp {
             log_tx,
             log_rx,
             downloading:  Arc::new(AtomicBool::new(false)),
-            runtime,
         }
     }
 
@@ -88,18 +82,26 @@ impl YtdlApp {
         flag.store(true, Ordering::SeqCst);
         self.log.push(format!("——— {} ———", url));
 
-        self.runtime.spawn(async move {
-            let result =
-                run_download(url, quality, audio_only, playlist_all, output_dir, tx.clone()).await;
-            match result {
-                Ok(_)  => tx.send("✓ Done.".into()).ok(),
-                Err(e) => tx.send(format!("✗ Error: {e}")).ok(),
-            };
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build tokio runtime");
+            rt.block_on(async move {
+                let result = run_download(url, quality, audio_only, playlist_all,
+                                          output_dir, tx.clone()).await;
+                match result {
+                    Ok(_)  => tx.send("✓ Done.".into()).ok(),
+                    Err(e) => tx.send(format!("✗ Error: {e}")).ok(),
+                };
+            });
             flag.store(false, Ordering::SeqCst);
             ctx.request_repaint();
         });
     }
 }
+
+const MAX_LOG_LINES: usize = 1000;
 
 // ── eframe::App impl ─────────────────────────────────────────────────────────
 
@@ -108,6 +110,9 @@ impl eframe::App for YtdlApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.log_rx.try_recv() {
             self.log.push(msg);
+        }
+        if self.log.len() > MAX_LOG_LINES {
+            self.log.drain(0..self.log.len() - MAX_LOG_LINES);
         }
         if self.downloading.load(Ordering::SeqCst) {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));

@@ -11,7 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 yt-dlp  = "2.7.2"
-tokio   = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio   = { version = "1", features = ["macros", "rt"] }
 anyhow  = "1"
 # glow (OpenGL) renderer instead of the default wgpu, which panics on some
 # Intel integrated GPUs ("Failed to create staging buffer").
@@ -25,3 +25,11 @@ rfd     = "0.17"
 # release that still satisfies yt-dlp's `lofty = "0.23.2"` requirement.
 [patch.crates-io]
 lofty = { git = "https://github.com/boul2gom/lofty-rs", rev = "f3fcfd031067ee5ba42a8745a42fed031ff0d7aa" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
